@@ -40,46 +40,64 @@ def build_docx(header_data, questions_list):
     style.font.name = 'Arial'
     style.font.size = Pt(10.5)
 
-    # 1. School Header
-    p = doc.add_paragraph()
+    # 1. School Header Layout
+    if header_data.get('logo_file'):
+        header_table = doc.add_table(rows=1, cols=2)
+        remove_table_borders(header_table)
+        header_table.rows[0].cells[0].width = Inches(1.2)
+        header_table.rows[0].cells[1].width = Inches(5.8)
+        
+        logo_p = header_table.cell(0, 0).paragraphs[0]
+        logo_run = logo_p.add_run()
+        logo_run.add_picture(header_data['logo_file'], width=Inches(1.0))
+        
+        text_cell = header_table.cell(0, 1)
+        p = text_cell.paragraphs[0]
+    else:
+        p = doc.add_paragraph()
+        
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.add_run(header_data['school_name']).bold = True
     p.runs[0].font.size = Pt(15)
 
-    p_sub = doc.add_paragraph()
+    if header_data.get('logo_file'):
+        p_sub = text_cell.add_paragraph()
+    else:
+        p_sub = doc.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_sub.add_run(f"{header_data['address']}\nPh: {header_data['phone']} | Email: {header_data['email']}").font.size = Pt(9)
+    p_sub.add_run(f"{header_data['address']}\nPh: {header_data['phone']} | Email: {header_data['email']}").font.size = Pt(9.5)
 
-    # 2. Metadata Grid (Time, Marks, Name, Roll)
+    doc.add_paragraph().paragraph_format.space_after = Pt(6)
+
+    # 2. Metadata Grid (Time, Marks, Name, Roll)[span_0](start_span)[span_0](end_span)
     meta_table = doc.add_table(rows=2, cols=2)
     remove_table_borders(meta_table)
     for row in meta_table.rows:
         row.cells[0].width = Inches(3.5)
         row.cells[1].width = Inches(3.5)
     
-    meta_table.cell(0, 0).paragraphs[0].text = f"Time: {header_data['time']}"
+    meta_table.cell(0, 0).paragraphs[0].text = f"Time: {header_data['time']}[span_1](start_span)"[span_1](end_span)
     m_cell = meta_table.cell(0, 1).paragraphs[0]
-    m_cell.text = f"M.M: {header_data['max_marks']}"
+    m_cell.text = f"M.M: {header_data['max_marks']}[span_2](start_span)"[span_2](end_span)
     m_cell.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     
-    meta_table.cell(1, 0).paragraphs[0].text = "Name: ______________________"
+    meta_table.cell(1, 0).paragraphs[0].text = "Name: ______________________[span_3](start_span)"[span_3](end_span)
     r_cell = meta_table.cell(1, 1).paragraphs[0]
-    r_cell.text = "Roll No: ____________"
+    r_cell.text = "Roll No: ____________[span_4](start_span)"[span_4](end_span)
     r_cell.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-    # Assessment Title
+    # Assessment Title[span_5](start_span)[span_5](end_span)
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_title.paragraph_format.space_before = Pt(12)
     p_title.paragraph_format.space_after = Pt(12)
-    r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']} | CLASS - {header_data['class_name']}")
+    r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']} | CLASS - {header_data['class_name']}")[span_6](start_span)[span_6](end_span)
     r_title.bold = True
 
-    # 3. Dynamic Question Generation Loop
+    # 3. Dynamic Question Generation Loop[span_7](start_span)[span_7](end_span)
     for idx, q in enumerate(questions_list, 1):
         q_type = q['type']
         
-        # Base Question layout table (Numbering protection)
         q_table = doc.add_table(rows=1, cols=2)
         remove_table_borders(q_table)
         q_table.rows[0].cells[0].width = Inches(0.4)
@@ -93,7 +111,6 @@ def build_docx(header_data, questions_list):
             m_run = q_text_p.add_run(f"   ({q['marks']})")
             m_run.bold = True
 
-        # Render Specific Layout Structures safely
         if q_type == "MCQ":
             opt_table = doc.add_table(rows=1, cols=4)
             remove_table_borders(opt_table)
@@ -107,14 +124,34 @@ def build_docx(header_data, questions_list):
         elif q_type == "Match the Following":
             match_table = doc.add_table(rows=len(q['pairs']), cols=2)
             remove_table_borders(match_table)
+            
+            # Lock sizes for columns to balance layout evenly
+            for row in match_table.rows:
+                row.cells[0].width = Inches(3.5)
+                row.cells[1].width = Inches(3.5)
+                
             for r_idx, pair in enumerate(q['pairs']):
-                # Sub-indent column positioning securely
                 c1 = match_table.cell(r_idx, 0).paragraphs[0]
                 c2 = match_table.cell(r_idx, 1).paragraphs[0]
                 c1.paragraph_format.left_indent = Inches(0.4)
                 c2.paragraph_format.left_indent = Inches(0.4)
-                c1.text = pair[0]
-                c2.text = pair[1]
+                
+                # Render Left Side (Text or Image)
+                if pair.get('left_type') == "Image" and pair.get('left_img'):
+                    c1.text = pair.get('left_prefix', '') + " "
+                    run_img1 = c1.add_run()
+                    run_img1.add_picture(pair['left_img'], width=Inches(1.0))
+                else:
+                    c1.text = pair.get('left_text', '')
+                    
+                # Render Right Side (Text or Image)
+                if pair.get('right_type') == "Image" and pair.get('right_img'):
+                    c2.text = pair.get('right_prefix', '') + " "
+                    run_img2 = c2.add_run()
+                    run_img2.add_picture(pair['right_img'], width=Inches(1.0))
+                else:
+                    c2.text = pair.get('right_text', '')
+                    
             match_table.rows[-1].cells[0].paragraphs[0].paragraph_format.space_after = Pt(8)
 
         elif q_type == "Image/Source Based":
@@ -122,9 +159,8 @@ def build_docx(header_data, questions_list):
                 img_p = doc.add_paragraph()
                 img_p.paragraph_format.left_indent = Inches(0.4)
                 img_run = img_p.add_run()
-                img_run.add_picture(q['image_file'], width=Inches(3.0)) # Scaled correctly
+                img_run.add_picture(q['image_file'], width=Inches(3.0))
             
-            # Sub-questions nested under image context
             for sub_idx, sub_q in enumerate(q['sub_questions'], 1):
                 sub_table = doc.add_table(rows=1, cols=2)
                 remove_table_borders(sub_table)
@@ -134,10 +170,9 @@ def build_docx(header_data, questions_list):
                 sub_table.cell(0, 1).paragraphs[0].text = sub_q
             doc.add_paragraph().paragraph_format.space_after = Pt(4)
             
-        else: # Fill in blanks or short questions
+        else:
             doc.add_paragraph().paragraph_format.space_after = Pt(4)
 
-    # Save out to buffer stream
     target_stream = io.BytesIO()
     doc.save(target_stream)
     target_stream.seek(0)
@@ -146,24 +181,24 @@ def build_docx(header_data, questions_list):
 # --- streamlit frontend interface ---
 st.set_page_config(page_title="Exam Creator Pro", layout="wide")
 st.title("📝 Automatic Exam Sheet Template Generator")
-st.caption("Input your contents safely. Formatting, indentation alignments, and grid structural limits are forced automatically.")
 
-# Sidebar Configuration for Header Details
 with st.sidebar:
     st.header("🏫 School & Header Info")
+    uploaded_logo = st.file_uploader("Upload School Logo", type=["png", "jpg", "jpeg"])
+    
     h_data = {
-        "school_name": st.text_input("School/Institution Name", "VSI GLOBAL SR. SEC. SCHOOL"),
-        "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Tonk Road, Jaipur"),
-        "phone": st.text_input("Phone Number", "9309305656"),
-        "email": st.text_input("Email ID", "vsiglobalschool@gmail.com"),
-        "assessment_name": st.text_input("Assessment Title", "ASSESSMENT SHEET - 2026-27"),
-        "subject": st.text_input("Subject", "EVS"),
-        "class_name": st.text_input("Class Level", "III"),
-        "time": st.text_input("Time Duration Limit", "1 HOUR"),
-        "max_marks": st.text_input("Maximum Marks (M.M)", "20")
+        "logo_file": uploaded_logo,
+        "school_name": st.text_input("School/Institution Name", "VSI GLOBAL SR. SEC. SCHOOL"),[span_8](start_span)[span_8](end_span)
+        "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Tonk Road, Jaipur"),[span_9](start_span)[span_9](end_span)
+        "phone": st.text_input("Phone Number", "9309305656"),[span_10](start_span)[span_10](end_span)
+        "email": st.text_input("Email ID", "vsiglobalschool@gmail.com"),[span_11](start_span)[span_11](end_span)
+        "assessment_name": st.text_input("Assessment Title", "ASSESSMENT SHEET - 2026-27"),[span_12](start_span)[span_12](end_span)
+        "subject": st.text_input("Subject", "EVS"),[span_13](start_span)[span_13](end_span)
+        "class_name": st.text_input("Class Level", "III"),[span_14](start_span)[span_14](end_span)
+        "time": st.text_input("Time Duration Limit", "1 HOUR"),[span_15](start_span)[span_15](end_span)
+        "max_marks": st.text_input("Maximum Marks (M.M)", "20")[span_16](start_span)[span_16](end_span)
     }
 
-# Main Application Dynamic Input Area
 if 'questions' not in st.session_state:
     st.session_state.questions = []
 
@@ -180,13 +215,15 @@ with col_add:
         if q_type_sel == "MCQ":
             new_q["options"] = ["(a) ", "(b) ", "(c) ", "(d) "]
         elif q_type_sel == "Match the Following":
-            new_q["pairs"] = [["i) Left Item A", "a. Right Item X"], ["ii) Left Item B", "b. Right Item Y"]]
+            new_q["pairs"] = [{
+                "left_type": "Text", "left_text": "i) Item", "left_prefix": "i)", "left_img": None,
+                "right_type": "Text", "right_text": "a. Target", "right_prefix": "a.", "right_img": None
+            }]
         elif q_type_sel == "Image/Source Based":
             new_q["image_file"] = None
             new_q["sub_questions"] = [""]
         st.session_state.questions.append(new_q)
 
-# Loop to draw forms sequentially on screen based on what she added
 for idx, question in enumerate(st.session_state.questions):
     with st.expander(f"Question N°{idx+1} — Form Category Layout: **{question['type']}**", expanded=True):
         c_q, c_m = st.columns([6, 2])
@@ -202,11 +239,33 @@ for idx, question in enumerate(st.session_state.questions):
         elif question['type'] == "Match the Following":
             st.markdown("**Define Match Pairs:**")
             if st.button("➕ Append row pair line", key=f"add_pair_{idx}"):
-                question['pairs'].append(["", ""])
+                p_count = len(question['pairs'])
+                question['pairs'].append({
+                    "left_type": "Text", "left_text": f"i) Item", "left_prefix": "i)", "left_img": None,
+                    "right_type": "Text", "right_text": "a. Target", "right_prefix": "a.", "right_img": None
+                })
+            
             for p_idx, pair in enumerate(question['pairs']):
-                cp1, cp2 = st.columns(2)
-                question['pairs'][p_idx][0] = cp1.text_input(f"Left Line {p_idx+1}", value=pair[0], key=f"p1_{idx}_{p_idx}")
-                question['pairs'][p_idx][1] = cp2.text_input(f"Right Line {p_idx+1}", value=pair[1], key=f"p2_{idx}_{p_idx}")
+                st.markdown(f"--- **Pair Row {p_idx+1}** ---")
+                l_col, r_col = st.columns(2)
+                
+                # Left Item Configuration
+                with l_col:
+                    pair['left_type'] = st.radio(f"Left Type ({p_idx+1})", ["Text", "Image"], index=0 if pair['left_type']=="Text" else 1, key=f"ltype_{idx}_{p_idx}")
+                    pair['left_prefix'] = st.text_input(f"Left Index (e.g. i)", value=pair.get('left_prefix', ''), key=f"lpref_{idx}_{p_idx}")
+                    if pair['left_type'] == "Text":
+                        pair['left_text'] = st.text_input(f"Left Text String", value=pair.get('left_text', ''), key=f"ltxt_{idx}_{p_idx}")
+                    else:
+                        pair['left_img'] = st.file_uploader(f"Upload Left Image", type=["png","jpg","jpeg"], key=f"limg_{idx}_{p_idx}")
+                
+                # Right Item Configuration
+                with r_col:
+                    pair['right_type'] = st.radio(f"Right Type ({p_idx+1})", ["Text", "Image"], index=0 if pair['right_type']=="Text" else 1, key=f"rtype_{idx}_{p_idx}")
+                    pair['right_prefix'] = st.text_input(f"Right Index (e.g. a.)", value=pair.get('right_prefix', ''), key=f"rpref_{idx}_{p_idx}")
+                    if pair['right_type'] == "Text":
+                        pair['right_text'] = st.text_input(f"Right Text String", value=pair.get('right_text', ''), key=f"rtxt_{idx}_{p_idx}")
+                    else:
+                        pair['right_img'] = st.file_uploader(f"Upload Right Image", type=["png","jpg","jpeg"], key=f"rimg_{idx}_{p_idx}")
                 
         elif question['type'] == "Image/Source Based":
             question['image_file'] = st.file_uploader("Upload reference diagram source asset", type=["png", "jpg", "jpeg"], key=f"img_{idx}")
@@ -220,7 +279,6 @@ for idx, question in enumerate(st.session_state.questions):
             st.session_state.questions.pop(idx)
             st.rerun()
 
-# --- Compile File Triggers ---
 st.write("---")
 if st.session_state.questions:
     if st.button("🚀 Render and Compile Document Grid Template"):
@@ -233,5 +291,3 @@ if st.session_state.questions:
                 file_name=f"{h_data['subject']}_Exam_Template.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
-else:
-    st.info("Add some question structural components above to begin generating the interactive file document template.")
