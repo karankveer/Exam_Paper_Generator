@@ -76,14 +76,14 @@ def build_docx(header_data, questions_list):
         row.cells[0].width = Inches(3.5)
         row.cells[1].width = Inches(3.5)
     
-    meta_table.cell(0, 0).paragraphs[0].text = f"Time: {header_data['time']}[span_1](start_span)"[span_1](end_span)
+    meta_table.cell(0, 0).paragraphs[0].text = f"Time: {header_data['time']}"
     m_cell = meta_table.cell(0, 1).paragraphs[0]
-    m_cell.text = f"M.M: {header_data['max_marks']}[span_2](start_span)"[span_2](end_span)
+    m_cell.text = f"M.M: {header_data['max_marks']}"
     m_cell.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     
-    meta_table.cell(1, 0).paragraphs[0].text = "Name: ______________________[span_3](start_span)"[span_3](end_span)
+    meta_table.cell(1, 0).paragraphs[0].text = "Name: ______________________"
     r_cell = meta_table.cell(1, 1).paragraphs[0]
-    r_cell.text = "Roll No: ____________[span_4](start_span)"[span_4](end_span)
+    r_cell.text = "Roll No: ____________"
     r_cell.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
     # Assessment Title[span_5](start_span)[span_5](end_span)
