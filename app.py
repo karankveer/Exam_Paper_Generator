@@ -38,13 +38,27 @@ def remove_table_borders(table):
     )
     tblPr.append(new_borders)
 
+# --- Helper to add a top or bottom single border line to a row ---
+def add_row_horizontal_border(row, border_position="bottom"):
+    for cell in row.cells:
+        tcPr = cell._tc.get_or_add_tcPr()
+        tcBorders = tcPr.first_child_found_in("w:tcBorders")
+        if tcBorders is not None:
+            tcPr.remove(tcBorders)
+        new_border = parse_xml(
+            f'<w:tcBorders {nsdecls("w")}>\n'
+            f'  <w:{border_position} w:val="single" w:sz="6" w:space="0" w:color="000000"/>\n'
+            f'</w:tcBorders>'
+        )
+        tcPr.append(new_border)
+
 # --- Docx production engine ---
 def build_docx(header_data, questions_list):
     doc = docx.Document()
     
     for section in doc.sections:
-        section.top_margin = Inches(0.75)
-        section.bottom_margin = Inches(0.75)
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
         section.left_margin = Inches(0.75)
         section.right_margin = Inches(0.75)
         section.page_width = Inches(8.5)
@@ -54,128 +68,122 @@ def build_docx(header_data, questions_list):
     style.font.name = 'Arial'
     style.font.size = Pt(10.5)
 
-    # --- 1. FIXED HEADER: BOX BOUNDARY BORDER ENCLOSURE ---
-    outer_header_box = doc.add_table(rows=1, cols=1)
-    format_cell_structure(outer_header_box.cell(0, 0), 7.0)
-    
-    # Inject solid single line outer border frame around header layout
-    tblPr = outer_header_box._tbl.tblPr
-    tblBorders = tblPr.first_child_found_in("w:tblBorders")
-    if tblBorders is not None:
-        tblPr.remove(tblBorders)
-    border_xml = parse_xml(
-        f'<w:tblBorders {nsdecls("w")}>\n'
-        f'  <w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
-        f'  <w:left w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
-        f'  <w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
-        f'  <w:right w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
-        f'  <w:insideH w:val="none"/>\n'
-        f'  <w:insideV w:val="none"/>\n'
-        f'</w:tblBorders>'
-    )
-    tblPr.append(border_xml)
-    
-    frame_cell = outer_header_box.cell(0, 0)
-    
-    # Internal text cushioning padding setup inside header frame
-    tcPr = frame_cell._tc.get_or_add_tcPr()
-    tcMar = OxmlElement('w:tcMar')
-    for m_type in ['top', 'left', 'bottom', 'right']:
-        node = OxmlElement(f'w:{m_type}')
-        node.set(qn('w:w'), '144') 
-        node.set(qn('w:type'), 'dxa')
-        tcMar.append(node)
-    tcPr.append(tcMar)
-
-    # Build internal components inside the frame
+    # 1. School Main Details Header Area
     if header_data.get('logo_file'):
-        inner_table = frame_cell.add_table(rows=1, cols=2)
-        remove_table_borders(inner_table)
-        format_cell_structure(inner_table.cell(0, 0), 1.2)
-        format_cell_structure(inner_table.cell(0, 1), 5.4)
+        header_table = doc.add_table(rows=1, cols=2)
+        remove_table_borders(header_table)
+        format_cell_structure(header_table.cell(0, 0), 1.2)
+        format_cell_structure(header_table.cell(0, 1), 5.8)
         
-        logo_p = inner_table.cell(0, 0).paragraphs[0]
+        logo_p = header_table.cell(0, 0).paragraphs[0]
         logo_run = logo_p.add_run()
         logo_run.add_picture(header_data['logo_file'], width=Inches(1.0))
-        p = inner_table.cell(0, 1).paragraphs[0]
+        p = header_table.cell(0, 1).paragraphs[0]
     else:
-        p = frame_cell.paragraphs[0]
+        p = doc.add_paragraph()
         
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_run = p.add_run(header_data['school_name'])
     p_run.bold = True
-    p_run.font.size = Pt(15)
+    p_run.font.size = Pt(14)
 
     if header_data.get('logo_file'):
-        p_sub = inner_table.cell(0, 1).add_paragraph()
+        p_sub = header_table.cell(0, 1).add_paragraph()
     else:
-        p_sub = frame_cell.add_paragraph()
+        p_sub = doc.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    sub_run = p_sub.add_run(f"{header_data['address']}\nPh: {header_data['phone']} | Email: {header_data['email']}")
+    sub_run = p_sub.add_run(f"{header_data['address']}\nPh. No. - {header_data['phone']}, Email - {header_data['email']}")
     sub_run.font.size = Pt(9.5)
 
-    # 2. Metadata Grid inside the same border frame
-    meta_table = frame_cell.add_table(rows=2, cols=2)
+    # 2. Student & Time Metadata Grid (Borderless layout matching original flow)
+    meta_table = doc.add_table(rows=2, cols=2)
     remove_table_borders(meta_table)
-    
     for row in meta_table.rows:
-        format_cell_structure(row.cells[0], 3.3)
-        format_cell_structure(row.cells[1], 3.3)
+        format_cell_structure(row.cells[0], 3.5)
+        format_cell_structure(row.cells[1], 3.5)
+        
+    p_time = meta_table.cell(0, 0).paragraphs[0]
+    p_time.add_run(f"Time: {header_data['time']}")
     
-    meta_table.cell(0, 0).paragraphs[0].add_run(f"Time: {header_data['time']}")
-    m_p = meta_table.cell(0, 1).paragraphs[0]
-    m_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    m_run = m_p.add_run(f"M.M: {header_data['max_marks']}")
-    m_run.bold = True
+    p_mm = meta_table.cell(0, 1).paragraphs[0]
+    p_mm.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    mm_run = p_mm.add_run(f"M.M: {header_data['max_marks']}")
+    mm_run.bold = True
     
-    meta_table.cell(1, 0).paragraphs[0].add_run("Name: ______________________")
-    r_p = meta_table.cell(1, 1).paragraphs[0]
-    r_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    r_p.add_run("Roll No: ____________")
+    p_name = meta_table.cell(1, 0).paragraphs[0]
+    p_name.add_run("Name: ______________________")
+    
+    p_roll = meta_table.cell(1, 1).paragraphs[0]
+    p_roll.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_roll.add_run("Roll No. ____________")
 
-    # Assessment Title Sub-block inside frame
-    p_title = frame_cell.add_paragraph()
+    # 3. Assessment Banner Box (Surrounded by clean top and bottom horizontal lines)
+    banner_table = doc.add_table(rows=1, cols=1)
+    remove_table_borders(banner_table)
+    format_cell_structure(banner_table.cell(0, 0), 7.0)
+    add_row_horizontal_border(banner_table.rows[0], "top")
+    add_row_horizontal_border(banner_table.rows[0], "bottom")
+    
+    p_title = banner_table.cell(0, 0).paragraphs[0]
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_title.paragraph_format.space_before = Pt(8)
+    p_title.paragraph_format.space_before = Pt(4)
     p_title.paragraph_format.space_after = Pt(4)
-    r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']} | CLASS - {header_data['class_name']}")
+    r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']}\nCLASS - {header_data['class_name']}")
     r_title.bold = True
     r_title.font.size = Pt(11)
 
-    doc.add_paragraph().paragraph_format.space_after = Pt(12)
+    # General Instructions line block
+    p_ins = doc.add_paragraph()
+    p_ins.paragraph_format.space_before = Pt(6)
+    p_ins.paragraph_format.space_after = Pt(12)
+    p_ins.add_run("General Instructions:\n1. All the questions are compulsory.\n2. Write the answers neatly in the answer sheet.")
 
-    # 3. Dynamic Question Processing Loop
+    # 4. Dynamic Question Processing Loop
+    current_main_heading = ""
     for idx, q in enumerate(questions_list, 1):
+        # Render main question headers dynamically if changed
+        if q.get('main_heading') and q.get('main_heading') != current_main_heading:
+            current_main_heading = q['main_heading']
+            h_table = doc.add_table(rows=1, cols=2)
+            remove_table_borders(h_table)
+            format_cell_structure(h_table.rows[0].cells[0], 5.2)
+            format_cell_structure(h_table.rows[0].cells[1], 1.8)
+            
+            hp1 = h_table.cell(0, 0).paragraphs[0]
+            hr1 = hp1.add_run(current_main_heading)
+            hr1.bold = True
+            
+            hp2 = h_table.cell(0, 1).paragraphs[0]
+            hp2.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            if q.get('section_marks'):
+                hr2 = hp2.add_run(f"({q['section_marks']})")
+                hr2.bold = True
+            h_table.rows[0].cells[0].paragraphs[0].paragraph_format.space_before = Pt(8)
+        
         q_type = q['type']
         
+        # Base Question Content Line Grid
         q_table = doc.add_table(rows=1, cols=2)
         remove_table_borders(q_table)
         format_cell_structure(q_table.rows[0].cells[0], 0.5)
         format_cell_structure(q_table.rows[0].cells[1], 6.5)
         
-        num_run = q_table.cell(0, 0).paragraphs[0].add_run(f"Q.{idx}")
+        num_run = q_table.cell(0, 0).paragraphs[0].add_run(f"{q.get('sub_number', idx)}")
         num_run.bold = True
         
         q_text_p = q_table.cell(0, 1).paragraphs[0]
         q_text_p.add_run(q['text'])
         
-        if q.get('marks'):
-            m_run = q_text_p.add_run(f"   ({q['marks']})")
-            m_run.bold = True
-
         if q_type == "MCQ":
             opt_table = doc.add_table(rows=1, cols=5)
             remove_table_borders(opt_table)
-            
             format_cell_structure(opt_table.rows[0].cells[0], 0.5)
             for i in range(4):
                 cell = opt_table.rows[0].cells[i + 1]
                 format_cell_structure(cell, 1.625)
                 p_opt = cell.paragraphs[0]
-                p_opt.paragraph_format.left_indent = Inches(0)
                 p_opt.add_run(q['options'][i])
-                
-            opt_table.rows[0].cells[0].paragraphs[0].paragraph_format.space_after = Pt(8)
+            opt_table.rows[0].cells[0].paragraphs[0].paragraph_format.space_after = Pt(6)
 
         elif q_type == "Match the Following":
             match_table = doc.add_table(rows=len(q['pairs']), cols=3)
@@ -192,8 +200,6 @@ def build_docx(header_data, questions_list):
                 
                 c1 = cell_left.paragraphs[0]
                 c2 = cell_right.paragraphs[0]
-                c1.paragraph_format.left_indent = Inches(0)
-                c2.paragraph_format.left_indent = Inches(0)
                 
                 if str(pair.get('left_type')).strip().lower() == "image" and pair.get('left_img'):
                     c1.add_run(pair.get('left_prefix', '') + " ")
@@ -206,8 +212,7 @@ def build_docx(header_data, questions_list):
                     c2.add_run().add_picture(pair['right_img'], width=Inches(1.0))
                 else:
                     c2.add_run(pair.get('right_text', ''))
-                    
-            match_table.rows[-1].cells[0].paragraphs[0].paragraph_format.space_after = Pt(8)
+            match_table.rows[-1].cells[0].paragraphs[0].paragraph_format.space_after = Pt(6)
 
         elif q_type == "Image/Source Based":
             if q.get('image_file'):
@@ -250,7 +255,7 @@ with st.sidebar:
     h_data = {
         "logo_file": uploaded_logo,
         "school_name": st.text_input("School/Institution Name", "VSI GLOBAL SR. SEC. SCHOOL"),
-        "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Tonk Road, Jaipur"),
+        "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Behind Pratap Plaza Tonk Road, Sanganer, Jaipur (Raj.)"),
         "phone": st.text_input("Phone Number", "9309305656"),
         "email": st.text_input("Email ID", "vsiglobalschool@gmail.com"),
         "assessment_name": st.text_input("Assessment Title", "ASSESSMENT SHEET - 2026-27"),
@@ -295,7 +300,14 @@ with col_type:
 with col_add:
     st.write("##")
     if st.button("➕ Add This Question Element"):
-        new_q = {"type": q_type_sel, "text": "", "marks": ""}
+        new_q = {
+            "type": q_type_sel, 
+            "main_heading": "Ques.1 Tick ( ) the Correct Answer.", 
+            "section_marks": "0.5 × 5 = 2.5", 
+            "sub_number": "i)", 
+            "text": "", 
+            "marks": ""
+        }
         if q_type_sel == "MCQ":
             new_q["options"] = ["(a) ", "(b) ", "(c) ", "(d) "]
         elif q_type_sel == "Match the Following":
@@ -310,10 +322,14 @@ with col_add:
 
 # Render forms interactively
 for idx, question in enumerate(st.session_state.questions):
-    with st.expander(f"Question N°{idx+1} — Form Category Layout: **{question['type']}**", expanded=True):
-        c_q, c_m = st.columns([6, 2])
-        question['text'] = c_q.text_area(f"Question/Instruction Text {idx+1}", value=question['text'], key=f"txt_{idx}")
-        question['marks'] = c_m.text_input(f"Marks allocation string", value=question['marks'], key=f"mrk_{idx}", placeholder="e.g. 0.5 × 5 = 2.5")
+    with st.expander(f"Question Element N°{idx+1} — Form Category Layout: **{question['type']}**", expanded=True):
+        ch1, ch2 = st.columns(2)
+        question['main_heading'] = ch1.text_input("Section Header (e.g. Ques.1...)", value=question.get('main_heading', ''), key=f"mh_{idx}")
+        question['section_marks'] = ch2.text_input("Section Total Marks (e.g. 0.5 × 5 = 2.5)", value=question.get('section_marks', ''), key=f"sm_{idx}")
+        
+        c_num, c_q = st.columns([2, 6])
+        question['sub_number'] = c_num.text_input("Question Numbering Index", value=question.get('sub_number', str(idx+1)), key=f"num_{idx}")
+        question['text'] = c_q.text_area(f"Question/Instruction Text String", value=question['text'], key=f"txt_{idx}")
         
         if question['type'] == "MCQ":
             st.markdown("**Enter Option Values below:**")
@@ -323,7 +339,6 @@ for idx, question in enumerate(st.session_state.questions):
                 
         elif question['type'] == "Match the Following":
             st.markdown("**Define Match Pairs:**")
-            
             c_add_p, c_rem_p = st.columns([1, 1])
             if c_add_p.button("➕ Append row pair line", key=f"add_pair_{idx}"):
                 question['pairs'].append({
@@ -345,17 +360,13 @@ for idx, question in enumerate(st.session_state.questions):
                     pair['left_prefix'] = st.text_input(f"Left Index (e.g. i)", value=pair.get('left_prefix', ''), key=f"lpref_{idx}_{p_idx}")
                     if pair['left_type'] == "Text":
                         pair['left_text'] = st.text_input(f"Left Text String", value=pair.get('left_text', ''), key=f"ltxt_{idx}_{p_idx}")
-                    else:
-                        pair['left_img'] = st.file_uploader(f"Upload Left Image ({p_idx+1})", type=["png","jpg","jpeg"], key=f"limg_{idx}_{p_idx}")
                 
                 with r_col:
                     pair['right_type'] = st.radio(f"Right Type ({p_idx+1})", ["Text", "Image"], index=0 if pair.get('right_type')=="Text" else 1, key=f"rtype_{idx}_{p_idx}")
                     pair['right_prefix'] = st.text_input(f"Right Index (e.g. a.)", value=pair.get('right_prefix', ''), key=f"rpref_{idx}_{p_idx}")
                     if pair['right_type'] == "Text":
                         pair['right_text'] = st.text_input(f"Right Text String", value=pair.get('right_text', ''), key=f"rtxt_{idx}_{p_idx}")
-                    else:
-                        pair['right_img'] = st.file_uploader(f"Upload Right Image ({p_idx+1})", type=["png","jpg","jpeg"], key=f"rimg_{idx}_{p_idx}")
-                
+
         elif question['type'] == "Image/Source Based":
             question['image_file'] = st.file_uploader(f"Upload Image/Source Context File {idx+1}", type=["png", "jpg", "jpeg"], key=f"ctx_img_{idx}")
             st.markdown("**Sub-questions attached below context:**")
