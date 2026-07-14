@@ -186,18 +186,19 @@ with st.sidebar:
     st.header("🏫 School & Header Info")
     uploaded_logo = st.file_uploader("Upload School Logo", type=["png", "jpg", "jpeg"])
     
-    h_data = {
+        h_data = {
         "logo_file": uploaded_logo,
-        "school_name": st.text_input("School/Institution Name", "VSI GLOBAL SR. SEC. SCHOOL"),[span_8](start_span)[span_8](end_span)
-        "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Tonk Road, Jaipur"),[span_9](start_span)[span_9](end_span)
-        "phone": st.text_input("Phone Number", "9309305656"),[span_10](start_span)[span_10](end_span)
-        "email": st.text_input("Email ID", "vsiglobalschool@gmail.com"),[span_11](start_span)[span_11](end_span)
-        "assessment_name": st.text_input("Assessment Title", "ASSESSMENT SHEET - 2026-27"),[span_12](start_span)[span_12](end_span)
-        "subject": st.text_input("Subject", "EVS"),[span_13](start_span)[span_13](end_span)
-        "class_name": st.text_input("Class Level", "III"),[span_14](start_span)[span_14](end_span)
-        "time": st.text_input("Time Duration Limit", "1 HOUR"),[span_15](start_span)[span_15](end_span)
-        "max_marks": st.text_input("Maximum Marks (M.M)", "20")[span_16](start_span)[span_16](end_span)
+        "school_name": st.text_input("School/Institution Name", "VSI GLOBAL SR. SEC. SCHOOL"),
+        "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Tonk Road, Jaipur"),
+        "phone": st.text_input("Phone Number", "9309305656"),
+        "email": st.text_input("Email ID", "vsiglobalschool@gmail.com"),
+        "assessment_name": st.text_input("Assessment Title", "ASSESSMENT SHEET - 2026-27"),
+        "subject": st.text_input("Subject", "EVS"),
+        "class_name": st.text_input("Class Level", "III"),
+        "time": st.text_input("Time Duration Limit", "1 HOUR"),
+        "max_marks": st.text_input("Maximum Marks (M.M)", "20")
     }
+
 
 if 'questions' not in st.session_state:
     st.session_state.questions = []
