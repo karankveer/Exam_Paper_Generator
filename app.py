@@ -156,7 +156,6 @@ def build_docx(header_data, questions_list):
                 c1.paragraph_format.left_indent = Inches(0.5)
                 c2.paragraph_format.left_indent = Inches(0.5)
                 
-                # Fixed Engine Check: Explicit string comparison ensures image blocks unpack perfectly
                 if str(pair.get('left_type')).strip().lower() == "image" and pair.get('left_img'):
                     c1.add_run(pair.get('left_prefix', '') + " ")
                     c1.add_run().add_picture(pair['left_img'], width=Inches(1.0))
@@ -228,7 +227,6 @@ if uploaded_json is not None:
         imported_data = json.load(uploaded_json)
         if isinstance(imported_data, list):
             if st.button("📥 Overwrite and load questions from JSON"):
-                # Normalize structure to guarantee UI fields render correctly
                 for q in imported_data:
                     if q['type'] == "Match the Following" and 'pairs' in q:
                         for p in q['pairs']:
@@ -284,7 +282,6 @@ for idx, question in enumerate(st.session_state.questions):
         elif question['type'] == "Match the Following":
             st.markdown("**Define Match Pairs:**")
             
-            # Action controls specifically inside the card framework
             c_add_p, c_rem_p = st.columns([1, 1])
             if c_add_p.button("➕ Append row pair line", key=f"add_pair_{idx}"):
                 question['pairs'].append({
@@ -340,7 +337,23 @@ for idx, question in enumerate(st.session_state.questions):
 
 st.write("---")
 if st.session_state.questions:
-    json_str = json.dumps(st.session_state.questions, indent=2)
+    # Safe backup compilation filtering out non-serializable objects
+    backup_ready_questions = []
+    for q in st.session_state.questions:
+        q_copy = q.copy()
+        if "image_file" in q_copy:
+            q_copy["image_file"] = None
+        if q_copy.get("type") == "Match the Following" and "pairs" in q_copy:
+            cleaned_pairs = []
+            for pair in q_copy["pairs"]:
+                p_copy = pair.copy()
+                if "left_img" in p_copy: p_copy["left_img"] = None
+                if "right_img" in p_copy: p_copy["right_img"] = None
+                cleaned_pairs.append(p_copy)
+            q_copy["pairs"] = cleaned_pairs
+        backup_ready_questions.append(q_copy)
+
+    json_str = json.dumps(backup_ready_questions, indent=2)
     st.sidebar.download_button(
         label="💾 Save Current Question Stack to JSON File",
         data=json_str,
