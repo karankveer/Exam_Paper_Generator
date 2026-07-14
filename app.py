@@ -156,13 +156,14 @@ def build_docx(header_data, questions_list):
                 c1.paragraph_format.left_indent = Inches(0.5)
                 c2.paragraph_format.left_indent = Inches(0.5)
                 
-                if pair.get('left_type') == "Image" and pair.get('left_img'):
+                # Fixed Engine Check: Explicit string comparison ensures image blocks unpack perfectly
+                if str(pair.get('left_type')).strip().lower() == "image" and pair.get('left_img'):
                     c1.add_run(pair.get('left_prefix', '') + " ")
                     c1.add_run().add_picture(pair['left_img'], width=Inches(1.0))
                 else:
                     c1.add_run(pair.get('left_text', ''))
                     
-                if pair.get('right_type') == "Image" and pair.get('right_img'):
+                if str(pair.get('right_type')).strip().lower() == "image" and pair.get('right_img'):
                     c2.add_run(pair.get('right_prefix', '') + " ")
                     c2.add_run().add_picture(pair['right_img'], width=Inches(1.0))
                 else:
@@ -218,7 +219,7 @@ with st.sidebar:
         "max_marks": st.text_input("Maximum Marks (M.M)", "20")
     }
 
-# --- NEW: JSON Import / Export Handling ---
+# --- JSON Import Processing ---
 st.subheader("📂 Bulk Import Options")
 uploaded_json = st.file_uploader("Upload pre-configured JSON question bank file", type=["json"])
 
@@ -227,11 +228,19 @@ if uploaded_json is not None:
         imported_data = json.load(uploaded_json)
         if isinstance(imported_data, list):
             if st.button("📥 Overwrite and load questions from JSON"):
+                # Normalize structure to guarantee UI fields render correctly
+                for q in imported_data:
+                    if q['type'] == "Match the Following" and 'pairs' in q:
+                        for p in q['pairs']:
+                            if 'left_type' not in p: p['left_type'] = "Text"
+                            if 'right_type' not in p: p['right_type'] = "Text"
+                            p['left_img'] = None
+                            p['right_img'] = None
                 st.session_state.questions = imported_data
                 st.success(f"Successfully imported {len(imported_data)} questions!")
                 st.rerun()
         else:
-            st.error("Invalid format: The JSON root layout must be a list containing question blocks.")
+            st.error("Invalid format: The JSON root layout must be a list.")
     except Exception as e:
         st.error(f"Error reading JSON file: {e}")
 
@@ -274,45 +283,65 @@ for idx, question in enumerate(st.session_state.questions):
                 
         elif question['type'] == "Match the Following":
             st.markdown("**Define Match Pairs:**")
-            if st.button("➕ Append row pair line", key=f"add_pair_{idx}"):
+            
+            # Action controls specifically inside the card framework
+            c_add_p, c_rem_p = st.columns([1, 1])
+            if c_add_p.button("➕ Append row pair line", key=f"add_pair_{idx}"):
                 question['pairs'].append({
                     "left_type": "Text", "left_text": "i) Item", "left_prefix": "i)", "left_img": None,
                     "right_type": "Text", "right_text": "a. Target", "right_prefix": "a.", "right_img": None
                 })
+                st.rerun()
+            if c_rem_p.button("➖ Remove last row pair", key=f"rem_pair_{idx}"):
+                if len(question['pairs']) > 1:
+                    question['pairs'].pop()
+                    st.rerun()
             
             for p_idx, pair in enumerate(question['pairs']):
-                st.markdown(f"--- **Pair Row {p_idx+1}** ---")
+                st.markdown(f"**Pair Row {p_idx+1}**")
                 l_col, r_col = st.columns(2)
                 
                 with l_col:
-                    pair['left_type'] = st.radio(f"Left Type ({p_idx+1})", ["Text", "Image"], index=0 if pair['left_type']=="Text" else 1, key=f"ltype_{idx}_{p_idx}")
+                    pair['left_type'] = st.radio(f"Left Type ({p_idx+1})", ["Text", "Image"], index=0 if pair.get('left_type')=="Text" else 1, key=f"ltype_{idx}_{p_idx}")
                     pair['left_prefix'] = st.text_input(f"Left Index (e.g. i)", value=pair.get('left_prefix', ''), key=f"lpref_{idx}_{p_idx}")
                     if pair['left_type'] == "Text":
                         pair['left_text'] = st.text_input(f"Left Text String", value=pair.get('left_text', ''), key=f"ltxt_{idx}_{p_idx}")
+                    else:
+                        pair['left_img'] = st.file_uploader(f"Upload Left Image ({p_idx+1})", type=["png","jpg","jpeg"], key=f"limg_{idx}_{p_idx}")
                 
                 with r_col:
-                    pair['right_type'] = st.radio(f"Right Type ({p_idx+1})", ["Text", "Image"], index=0 if pair['right_type']=="Text" else 1, key=f"rtype_{idx}_{p_idx}")
+                    pair['right_type'] = st.radio(f"Right Type ({p_idx+1})", ["Text", "Image"], index=0 if pair.get('right_type')=="Text" else 1, key=f"rtype_{idx}_{p_idx}")
                     pair['right_prefix'] = st.text_input(f"Right Index (e.g. a.)", value=pair.get('right_prefix', ''), key=f"rpref_{idx}_{p_idx}")
                     if pair['right_type'] == "Text":
                         pair['right_text'] = st.text_input(f"Right Text String", value=pair.get('right_text', ''), key=f"rtxt_{idx}_{p_idx}")
+                    else:
+                        pair['right_img'] = st.file_uploader(f"Upload Right Image ({p_idx+1})", type=["png","jpg","jpeg"], key=f"rimg_{idx}_{p_idx}")
                 
         elif question['type'] == "Image/Source Based":
-            st.warning("Note: Base structural images or diagrams must be manually attached via the web dashboard directly.")
+            question['image_file'] = st.file_uploader(f"Upload Image/Source Context File {idx+1}", type=["png", "jpg", "jpeg"], key=f"ctx_img_{idx}")
             st.markdown("**Sub-questions attached below context:**")
-            if st.button("➕ Append sub-question step line", key=f"add_sub_{idx}"):
+            
+            c_add_s, c_rem_s = st.columns([1, 1])
+            if c_add_s.button("➕ Append sub-question step line", key=f"add_sub_{idx}"):
                 question['sub_questions'].append("")
+                st.rerun()
+            if c_rem_s.button("➖ Remove last sub-question", key=f"rem_sub_{idx}"):
+                if len(question['sub_questions']) > 1:
+                    question['sub_questions'].pop()
+                    st.rerun()
+                    
             for s_idx, sub_q in enumerate(question['sub_questions']):
                 question['sub_questions'][s_idx] = st.text_input(f"Sub-question ({s_idx+1}) Text", value=sub_q, key=f"sub_{idx}_{s_idx}")
 
-        if st.button("🗑️ Delete Question Element", key=f"del_{idx}"):
+        st.write("##")
+        if st.button("🗑️ Delete Entire Question Block", key=f"del_{idx}"):
             st.session_state.questions.pop(idx)
             st.rerun()
 
 st.write("---")
 if st.session_state.questions:
-    # Optional JSON download block to back up work
     json_str = json.dumps(st.session_state.questions, indent=2)
-    st.download_button(
+    st.sidebar.download_button(
         label="💾 Save Current Question Stack to JSON File",
         data=json_str,
         file_name="question_backup.json",
