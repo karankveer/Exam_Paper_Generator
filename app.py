@@ -54,21 +54,52 @@ def build_docx(header_data, questions_list):
     style.font.name = 'Arial'
     style.font.size = Pt(10.5)
 
-    # 1. School Header Block
+    # --- 1. FIXED HEADER: BOX BOUNDARY BORDER ENCLOSURE ---
+    outer_header_box = doc.add_table(rows=1, cols=1)
+    format_cell_structure(outer_header_box.cell(0, 0), 7.0)
+    
+    # Inject solid single line outer border frame around header layout
+    tblPr = outer_header_box._tbl.tblPr
+    tblBorders = tblPr.first_child_found_in("w:tblBorders")
+    if tblBorders is not None:
+        tblPr.remove(tblBorders)
+    border_xml = parse_xml(
+        f'<w:tblBorders {nsdecls("w")}>\n'
+        f'  <w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
+        f'  <w:left w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
+        f'  <w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
+        f'  <w:right w:val="single" w:sz="12" w:space="0" w:color="000000"/>\n'
+        f'  <w:insideH w:val="none"/>\n'
+        f'  <w:insideV w:val="none"/>\n'
+        f'</w:tblBorders>'
+    )
+    tblPr.append(border_xml)
+    
+    frame_cell = outer_header_box.cell(0, 0)
+    
+    # Internal text cushioning padding setup inside header frame
+    tcPr = frame_cell._tc.get_or_add_tcPr()
+    tcMar = OxmlElement('w:tcMar')
+    for m_type in ['top', 'left', 'bottom', 'right']:
+        node = OxmlElement(f'w:{m_type}')
+        node.set(qn('w:w'), '144') 
+        node.set(qn('w:type'), 'dxa')
+        tcMar.append(node)
+    tcPr.append(tcMar)
+
+    # Build internal components inside the frame
     if header_data.get('logo_file'):
-        header_table = doc.add_table(rows=1, cols=2)
-        remove_table_borders(header_table)
-        format_cell_structure(header_table.cell(0, 0), 1.2)
-        format_cell_structure(header_table.cell(0, 1), 5.8)
+        inner_table = frame_cell.add_table(rows=1, cols=2)
+        remove_table_borders(inner_table)
+        format_cell_structure(inner_table.cell(0, 0), 1.2)
+        format_cell_structure(inner_table.cell(0, 1), 5.4)
         
-        logo_p = header_table.cell(0, 0).paragraphs[0]
+        logo_p = inner_table.cell(0, 0).paragraphs[0]
         logo_run = logo_p.add_run()
         logo_run.add_picture(header_data['logo_file'], width=Inches(1.0))
-        
-        text_cell = header_table.cell(0, 1)
-        p = text_cell.paragraphs[0]
+        p = inner_table.cell(0, 1).paragraphs[0]
     else:
-        p = doc.add_paragraph()
+        p = frame_cell.paragraphs[0]
         
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_run = p.add_run(header_data['school_name'])
@@ -76,22 +107,20 @@ def build_docx(header_data, questions_list):
     p_run.font.size = Pt(15)
 
     if header_data.get('logo_file'):
-        p_sub = text_cell.add_paragraph()
+        p_sub = inner_table.cell(0, 1).add_paragraph()
     else:
-        p_sub = doc.add_paragraph()
+        p_sub = frame_cell.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     sub_run = p_sub.add_run(f"{header_data['address']}\nPh: {header_data['phone']} | Email: {header_data['email']}")
     sub_run.font.size = Pt(9.5)
 
-    doc.add_paragraph().paragraph_format.space_after = Pt(4)
-
-    # 2. Metadata Grid
-    meta_table = doc.add_table(rows=2, cols=2)
+    # 2. Metadata Grid inside the same border frame
+    meta_table = frame_cell.add_table(rows=2, cols=2)
     remove_table_borders(meta_table)
     
     for row in meta_table.rows:
-        format_cell_structure(row.cells[0], 3.5)
-        format_cell_structure(row.cells[1], 3.5)
+        format_cell_structure(row.cells[0], 3.3)
+        format_cell_structure(row.cells[1], 3.3)
     
     meta_table.cell(0, 0).paragraphs[0].add_run(f"Time: {header_data['time']}")
     m_p = meta_table.cell(0, 1).paragraphs[0]
@@ -104,13 +133,16 @@ def build_docx(header_data, questions_list):
     r_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     r_p.add_run("Roll No: ____________")
 
-    p_title = doc.add_paragraph()
+    # Assessment Title Sub-block inside frame
+    p_title = frame_cell.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_title.paragraph_format.space_before = Pt(12)
-    p_title.paragraph_format.space_after = Pt(12)
+    p_title.paragraph_format.space_before = Pt(8)
+    p_title.paragraph_format.space_after = Pt(4)
     r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']} | CLASS - {header_data['class_name']}")
     r_title.bold = True
     r_title.font.size = Pt(11)
+
+    doc.add_paragraph().paragraph_format.space_after = Pt(12)
 
     # 3. Dynamic Question Processing Loop
     for idx, q in enumerate(questions_list, 1):
@@ -132,29 +164,36 @@ def build_docx(header_data, questions_list):
             m_run.bold = True
 
         if q_type == "MCQ":
-            opt_table = doc.add_table(rows=1, cols=4)
+            opt_table = doc.add_table(rows=1, cols=5)
             remove_table_borders(opt_table)
-            for i, cell in enumerate(opt_table.rows[0].cells):
-                format_cell_structure(cell, 1.75)
+            
+            format_cell_structure(opt_table.rows[0].cells[0], 0.5)
+            for i in range(4):
+                cell = opt_table.rows[0].cells[i + 1]
+                format_cell_structure(cell, 1.625)
                 p_opt = cell.paragraphs[0]
-                p_opt.paragraph_format.left_indent = Inches(0.5)
+                p_opt.paragraph_format.left_indent = Inches(0)
                 p_opt.add_run(q['options'][i])
-            opt_table.rows[0].cells[0].paragraphs[0].paragraph_format.space_after = Pt(6)
+                
+            opt_table.rows[0].cells[0].paragraphs[0].paragraph_format.space_after = Pt(8)
 
         elif q_type == "Match the Following":
-            match_table = doc.add_table(rows=len(q['pairs']), cols=2)
+            match_table = doc.add_table(rows=len(q['pairs']), cols=3)
             remove_table_borders(match_table)
             
             for r_idx, pair in enumerate(q['pairs']):
-                cell_left = match_table.cell(r_idx, 0)
-                cell_right = match_table.cell(r_idx, 1)
-                format_cell_structure(cell_left, 3.5)
-                format_cell_structure(cell_right, 3.5)
+                cell_spacer = match_table.cell(r_idx, 0)
+                cell_left = match_table.cell(r_idx, 1)
+                cell_right = match_table.cell(r_idx, 2)
+                
+                format_cell_structure(cell_spacer, 0.5)
+                format_cell_structure(cell_left, 3.25)
+                format_cell_structure(cell_right, 3.25)
                 
                 c1 = cell_left.paragraphs[0]
                 c2 = cell_right.paragraphs[0]
-                c1.paragraph_format.left_indent = Inches(0.5)
-                c2.paragraph_format.left_indent = Inches(0.5)
+                c1.paragraph_format.left_indent = Inches(0)
+                c2.paragraph_format.left_indent = Inches(0)
                 
                 if str(pair.get('left_type')).strip().lower() == "image" and pair.get('left_img'):
                     c1.add_run(pair.get('left_prefix', '') + " ")
@@ -168,26 +207,29 @@ def build_docx(header_data, questions_list):
                 else:
                     c2.add_run(pair.get('right_text', ''))
                     
-            match_table.rows[-1].cells[0].paragraphs[0].paragraph_format.space_after = Pt(6)
+            match_table.rows[-1].cells[0].paragraphs[0].paragraph_format.space_after = Pt(8)
 
         elif q_type == "Image/Source Based":
             if q.get('image_file'):
-                img_p = doc.add_paragraph()
-                img_p.paragraph_format.left_indent = Inches(0.5)
-                img_p.add_run().add_picture(q['image_file'], width=Inches(3.0))
+                img_table = doc.add_table(rows=1, cols=2)
+                remove_table_borders(img_table)
+                format_cell_structure(img_table.cell(0, 0), 0.5)
+                format_cell_structure(img_table.cell(0, 1), 6.5)
+                img_table.cell(0, 1).paragraphs[0].add_run().add_picture(q['image_file'], width=Inches(3.0))
             
             for sub_idx, sub_q in enumerate(q['sub_questions'], 1):
-                sub_table = doc.add_table(rows=1, cols=2)
+                sub_table = doc.add_table(rows=1, cols=3)
                 remove_table_borders(sub_table)
-                format_cell_structure(sub_table.rows[0].cells[0], 0.8)
-                format_cell_structure(sub_table.rows[0].cells[1], 6.2)
+                format_cell_structure(sub_table.rows[0].cells[0], 0.5)
+                format_cell_structure(sub_table.rows[0].cells[1], 0.5)
+                format_cell_structure(sub_table.rows[0].cells[2], 6.0)
                 
-                sub_table.cell(0, 0).paragraphs[0].add_run(f"  ({sub_idx})")
-                sub_table.cell(0, 1).paragraphs[0].add_run(sub_q)
-            doc.add_paragraph().paragraph_format.space_after = Pt(4)
+                sub_table.cell(0, 1).paragraphs[0].add_run(f"({sub_idx})")
+                sub_table.cell(0, 2).paragraphs[0].add_run(sub_q)
+            doc.add_paragraph().paragraph_format.space_after = Pt(6)
             
         else:
-            doc.add_paragraph().paragraph_format.space_after = Pt(4)
+            doc.add_paragraph().paragraph_format.space_after = Pt(6)
 
     target_stream = io.BytesIO()
     doc.save(target_stream)
@@ -337,7 +379,6 @@ for idx, question in enumerate(st.session_state.questions):
 
 st.write("---")
 if st.session_state.questions:
-    # Safe backup compilation filtering out non-serializable objects
     backup_ready_questions = []
     for q in st.session_state.questions:
         q_copy = q.copy()
