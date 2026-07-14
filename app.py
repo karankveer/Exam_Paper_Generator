@@ -91,7 +91,7 @@ def build_docx(header_data, questions_list):
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_title.paragraph_format.space_before = Pt(12)
     p_title.paragraph_format.space_after = Pt(12)
-    r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']} | CLASS - {header_data['class_name']}")[span_6](start_span)[span_6](end_span)
+    r_title = p_title.add_run(f"{header_data['assessment_name']}\nSUBJECT - {header_data['subject']} | CLASS - {header_data['class_name']}")
     r_title.bold = True
 
     # 3. Dynamic Question Generation Loop[span_7](start_span)[span_7](end_span)
