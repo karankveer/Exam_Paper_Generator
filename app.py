@@ -185,8 +185,7 @@ st.title("📝 Automatic Exam Sheet Template Generator")
 with st.sidebar:
     st.header("🏫 School & Header Info")
     uploaded_logo = st.file_uploader("Upload School Logo", type=["png", "jpg", "jpeg"])
-    
-        h_data = {
+    h_data = {
         "logo_file": uploaded_logo,
         "school_name": st.text_input("School/Institution Name", "VSI GLOBAL SR. SEC. SCHOOL"),
         "address": st.text_area("Address Line", "Sec. 5, Pratap Nagar, Tonk Road, Jaipur"),
